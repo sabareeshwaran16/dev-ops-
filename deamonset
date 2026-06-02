@@ -36,3 +36,20 @@ spec:
    86  kubectl get ds
    87  kubectl get ds,po -o wide
 
+for node name 
+90  vi nginx-deployment.yaml
+   91  cat nginx-deployment.yaml
+   92  kubectl create -f nginx-deployment.yaml
+   93  kubectl get node
+   94  kubectl get node --show-label
+   95  kubectl get node --show-labels
+   96  kubectl label node k3s-worker1.sece.com app=web-app
+   97  kubectl label node k3s-worker2.sece.com name=sabaree
+   98  kubectl get node --show-labels
+   99  vi nginx-deployment.yaml
+  100  kubectl apply -f nginx-deployment.yaml
+  101  kubectl delete deployment.apps/nginx-deployment
+  102  kubectl create -f nginx-deployment.yaml
+  103  history
+  104  cat  nginx-deployment.yaml
+  105  history

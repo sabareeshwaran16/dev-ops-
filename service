@@ -1,0 +1,418 @@
+# Kubernetes LoadBalancer with MetalLB - Lab Notes
+
+## Cluster Details
+
+Nodes:
+
+k3s-master.sece.com  -> 192.168.218.129
+
+k3s-worker1.sece.com -> 192.168.218.130
+
+k3s-worker2.sece.com -> 192.168.218.131
+
+---
+
+# Objective
+
+Expose applications using:
+
+1. ClusterIP
+2. NodePort
+3. LoadBalancer
+
+Implement LoadBalancer using MetalLB.
+
+---
+
+# Install MetalLB
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.15.3/config/manifests/metallb-native.yaml
+```
+
+Verify:
+
+```bash
+kubectl get pods -n metallb-system -o wide
+```
+
+---
+
+# Issue Encountered
+
+Error:
+
+```text
+failed calling webhook
+
+no endpoints available for service "metallb-webhook-service"
+```
+
+Reason:
+
+MetalLB controller and speaker pods were not running.
+
+---
+
+# Troubleshooting
+
+Check pods:
+
+```bash
+kubectl get pods -n metallb-system
+```
+
+Check events:
+
+```bash
+kubectl describe pod <pod-name> -n metallb-system
+```
+
+Check DNS:
+
+```bash
+nslookup quay.io
+```
+
+---
+
+# Issue Encountered
+
+Error:
+
+```text
+secret "memberlist" not found
+```
+
+Reason:
+
+Speaker pods require the memberlist secret.
+
+Fix:
+
+```bash
+kubectl create secret generic memberlist \
+-n metallb-system \
+--from-literal=secretkey="$(openssl rand -base64 128)"
+```
+
+Restart pods:
+
+```bash
+kubectl delete pod --all -n metallb-system
+```
+
+Verify:
+
+```bash
+kubectl get pods -n metallb-system
+```
+
+Expected:
+
+```text
+controller   1/1 Running
+speaker      1/1 Running
+speaker      1/1 Running
+```
+
+---
+
+# Create IP Pool
+
+Definition:
+
+IP range assigned by MetalLB to LoadBalancer services.
+
+File:
+
+ippool.yaml
+
+```yaml
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: first-pool
+  namespace: metallb-system
+
+spec:
+  addresses:
+  - 192.168.218.240-192.168.218.250
+```
+
+Apply:
+
+```bash
+kubectl apply -f ippool.yaml
+```
+
+Verify:
+
+```bash
+kubectl get ipaddresspool -n metallb-system
+```
+
+---
+
+# Create L2 Advertisement
+
+Definition:
+
+Advertises MetalLB IP addresses to the local network.
+
+File:
+
+l2ad.yaml
+
+```yaml
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: example
+  namespace: metallb-system
+```
+
+Apply:
+
+```bash
+kubectl apply -f l2ad.yaml
+```
+
+Verify:
+
+```bash
+kubectl get l2advertisement -n metallb-system
+```
+
+---
+
+# Deploy Nginx
+
+```bash
+kubectl create deployment nginx --image=nginx
+```
+
+Verify:
+
+```bash
+kubectl get deployments
+
+kubectl get pods
+```
+
+---
+
+# Create LoadBalancer Service
+
+```bash
+kubectl expose deployment nginx --type=LoadBalancer --port=80
+```
+
+Issue:
+
+```text
+services "nginx" already exists
+```
+
+Reason:
+
+An nginx NodePort service already existed.
+
+Fix:
+
+```bash
+kubectl delete svc nginx
+```
+
+Recreate:
+
+```bash
+kubectl expose deployment nginx --type=LoadBalancer --port=80
+```
+
+---
+
+# Verify LoadBalancer
+
+```bash
+kubectl get svc
+```
+
+Output:
+
+```text
+NAME    TYPE           CLUSTER-IP       EXTERNAL-IP
+nginx   LoadBalancer   10.43.137.244    192.168.218.241
+```
+
+MetalLB assigned:
+
+```text
+192.168.218.241
+```
+
+from:
+
+```text
+192.168.218.240-192.168.218.250
+```
+
+---
+
+# Test Application
+
+```bash
+curl http://192.168.218.241
+```
+
+Expected:
+
+```html
+Welcome to nginx!
+```
+
+---
+
+# Endpoint Concept
+
+Definition:
+
+Endpoints show which Pods are connected to a Service.
+
+Check:
+
+```bash
+kubectl get endpoints
+```
+
+Example:
+
+```text
+nginx   10.42.2.40:80
+```
+
+Meaning:
+
+```text
+Service
+   |
+   V
+Pod
+```
+
+---
+
+# Issue Encountered - No Endpoints
+
+Output:
+
+```text
+php-service
+```
+
+No IPs displayed.
+
+Reason:
+
+Service selector did not match Pod labels.
+
+Check service selector:
+
+```bash
+kubectl describe svc php-service
+```
+
+Check pod labels:
+
+```bash
+kubectl get pods --show-labels
+```
+
+Fix:
+
+Service selector and Pod labels must match.
+
+Example:
+
+Pod:
+
+app=php
+
+Service:
+
+app=php
+
+---
+
+# Service Types
+
+ClusterIP
+
+Definition:
+Accessible only inside cluster.
+
+Command:
+
+```bash
+kubectl expose deployment nginx --port=80
+```
+
+---
+
+NodePort
+
+Definition:
+Accessible outside cluster using NodeIP and Port.
+
+Command:
+
+```bash
+kubectl expose deployment nginx --type=NodePort --port=80
+```
+
+Access:
+
+```text
+http://NodeIP:NodePort
+```
+
+---
+
+LoadBalancer
+
+Definition:
+Accessible outside cluster using External IP.
+
+Command:
+
+```bash
+kubectl expose deployment nginx --type=LoadBalancer --port=80
+```
+
+Access:
+
+```text
+http://192.168.218.241
+```
+
+---
+
+# Important Commands
+
+kubectl get pods
+
+kubectl get svc
+
+kubectl get endpoints
+
+kubectl get nodes
+
+kubectl describe pod <pod-name>
+
+kubectl describe svc <service-name>
+
+kubectl logs <pod-name>
+
+kubectl get events --sort-by=.lastTimestamp
+
+kubectl get pods --show-labels

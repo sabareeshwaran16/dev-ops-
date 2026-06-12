@@ -1,352 +1,561 @@
-# Kubernetes Services Lab Notes
+# Kubernetes Services Lab
 
-## Cluster Details
+## Objective
 
-Nodes:
+In this lab, you will learn:
 
-k3s-master.sece.com  → 192.168.218.129
-
-k3s-worker1.sece.com → 192.168.218.130
-
-k3s-worker2.sece.com → 192.168.218.131
+* Kubernetes Services
+* ClusterIP Service
+* NodePort Service
+* LoadBalancer Service
+* MetalLB Installation and Configuration
+* Endpoints
+* Troubleshooting Service Issues
+* Scaling Applications
 
 ---
 
-# Service
+# Cluster Details
 
-Definition:
-A Service provides a stable way to access Pods.
+| Node                 | IP Address      |
+| -------------------- | --------------- |
+| k3s-master.sece.com  | 192.168.218.129 |
+| k3s-worker1.sece.com | 192.168.218.130 |
+| k3s-worker2.sece.com | 192.168.218.131 |
 
-Flow:
+---
 
+# What is a Service?
+
+A Service provides a stable network endpoint for accessing Pods.
+
+Without a Service:
+
+```
+User → Pod
+```
+
+Problem:
+
+* Pod IPs change when Pods restart.
+
+With a Service:
+
+```
 User → Service → Pod
+```
 
-Check:
+Benefits:
 
+* Stable IP
+* Load Balancing
+* Service Discovery
+* External Access
+
+Check Services:
+
+```bash
 kubectl get svc
+```
 
 ---
 
 # ClusterIP Service
 
-Definition:
-ClusterIP exposes an application only inside the Kubernetes cluster.
+## Definition
 
-Create Deployment:
+ClusterIP is the default Service type.
 
+It exposes an application only inside the Kubernetes cluster.
+
+---
+
+## Create Deployment
+
+```bash
 kubectl create deployment nginx --image=nginx
+```
 
-Expose as ClusterIP:
+---
 
+## Expose Deployment
+
+```bash
 kubectl expose deployment nginx --port=80
+```
 
-Check:
+---
 
+## Verify Service
+
+```bash
 kubectl get svc
+```
 
-Output:
+Example:
 
-TYPE = ClusterIP
+```text
+NAME         TYPE        CLUSTER-IP
+nginx        ClusterIP   10.43.10.20
+```
 
-Check Endpoints:
+---
 
+## Check Endpoints
+
+```bash
 kubectl get endpoints
+```
 
-Access:
+Example:
 
-Only from inside cluster.
+```text
+nginx    10.42.0.12:80
+```
 
-Flow:
+---
 
+## Traffic Flow
+
+```
 Pod
-↑
-|
+ ↑
+ |
 ClusterIP Service
+```
+
+Only Pods inside the cluster can access the service.
 
 ---
 
 # NodePort Service
 
-Definition:
-NodePort exposes an application outside the cluster using Node IP and Port.
+## Definition
 
-Create Deployment:
+NodePort exposes an application outside the cluster using:
 
+* Node IP
+* NodePort
+
+---
+
+## Create Deployment
+
+```bash
 kubectl create deployment nginx --image=nginx
+```
 
-Expose as NodePort:
+---
 
+## Expose as NodePort
+
+```bash
 kubectl expose deployment nginx --type=NodePort --port=80
+```
 
-Check:
+---
 
+## Verify
+
+```bash
 kubectl get svc
+```
 
 Example:
 
-nginx NodePort 80:30080/TCP
+```text
+NAME    TYPE       PORT(S)
+nginx   NodePort  80:30080/TCP
+```
 
-Access:
+---
 
+## Access Application
+
+```text
 http://192.168.218.129:30080
+```
 
 or
 
+```text
 http://192.168.218.130:30080
+```
 
 or
 
+```text
 http://192.168.218.131:30080
+```
 
-Flow:
+---
 
+## Traffic Flow
+
+```
 Browser
-|
+   |
 NodeIP:30080
-|
+   |
 NodePort Service
-|
+   |
 Pod
+```
 
-Verify:
+---
 
+## Verify Endpoints
+
+```bash
 kubectl get endpoints
+```
 
+```bash
 kubectl describe svc nginx
+```
 
 ---
 
-# MetalLB Installation
+# MetalLB
 
-Definition:
-MetalLB provides External IPs for LoadBalancer services in on-premise Kubernetes.
+## What is MetalLB?
 
-Install:
+MetalLB provides External IP addresses for LoadBalancer Services in on-premises Kubernetes clusters.
 
+Without MetalLB:
+
+```text
+EXTERNAL-IP = <pending>
+```
+
+With MetalLB:
+
+```text
+EXTERNAL-IP = 192.168.218.241
+```
+
+---
+
+# Install MetalLB
+
+```bash
 kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.15.3/config/manifests/metallb-native.yaml
-
-Verify:
-
-kubectl get pods -n metallb-system
+```
 
 ---
 
-# Issue Encountered
+## Verify Installation
 
-Error:
+```bash
+kubectl get pods -n metallb-system
+```
 
+---
+
+# Troubleshooting MetalLB
+
+## Error 1
+
+```text
 failed calling webhook
-
 no endpoints available for service "metallb-webhook-service"
+```
 
-Reason:
+### Cause
 
-MetalLB controller not running.
+MetalLB controller is not running.
 
 ---
 
-# Issue Encountered
+## Error 2
 
-Error:
-
+```text
 secret "memberlist" not found
+```
 
-Fix:
+### Fix
 
-kubectl create secret generic memberlist 
--n metallb-system 
+Create memberlist secret:
+
+```bash
+kubectl create secret generic memberlist \
+-n metallb-system \
 --from-literal=secretkey="$(openssl rand -base64 128)"
+```
 
-Restart:
+Restart MetalLB:
 
+```bash
 kubectl delete pod --all -n metallb-system
+```
 
 Verify:
 
+```bash
 kubectl get pods -n metallb-system
+```
 
 Expected:
 
-controller 1/1 Running
-
-speaker 1/1 Running
-
-speaker 1/1 Running
+```text
+controller      1/1 Running
+speaker         1/1 Running
+speaker         1/1 Running
+```
 
 ---
 
-# IPAddressPool
+# Configure IPAddressPool
 
-Definition:
-Range of IP addresses assigned by MetalLB.
+## Create IP Pool
 
-Create:
-
+```bash
 vi ippool.yaml
+```
 
+```yaml
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
 metadata:
-name: first-pool
-namespace: metallb-system
+  name: first-pool
+  namespace: metallb-system
 
 spec:
-addresses:
-
-* 192.168.218.240-192.168.218.250
+  addresses:
+  - 192.168.218.240-192.168.218.250
+```
 
 Apply:
 
+```bash
 kubectl apply -f ippool.yaml
+```
 
 Verify:
 
+```bash
 kubectl get ipaddresspool -n metallb-system
+```
 
 ---
 
-# L2Advertisement
-
-Definition:
-Advertises MetalLB IPs to the local network.
+# Configure L2Advertisement
 
 Create:
 
+```bash
 vi l2ad.yaml
+```
 
+```yaml
 apiVersion: metallb.io/v1beta1
 kind: L2Advertisement
 metadata:
-name: example
-namespace: metallb-system
+  name: example
+  namespace: metallb-system
+```
 
 Apply:
 
+```bash
 kubectl apply -f l2ad.yaml
+```
 
 Verify:
 
+```bash
 kubectl get l2advertisement -n metallb-system
+```
 
 ---
 
 # LoadBalancer Service
 
-Definition:
-LoadBalancer exposes an application using an External IP.
+## Definition
 
-Expose:
+LoadBalancer Service exposes an application using an External IP.
 
+---
+
+## Create Service
+
+```bash
 kubectl expose deployment nginx --type=LoadBalancer --port=80
+```
 
-Issue:
+---
 
+## Existing Service Error
+
+```text
 services "nginx" already exists
+```
 
-Fix:
+### Fix
 
+Delete old Service:
+
+```bash
 kubectl delete svc nginx
+```
 
+Recreate:
+
+```bash
 kubectl expose deployment nginx --type=LoadBalancer --port=80
+```
 
-Check:
+---
 
+## Verify
+
+```bash
 kubectl get svc
+```
 
-Output:
+Example:
 
-nginx LoadBalancer 192.168.218.241
+```text
+NAME    TYPE           EXTERNAL-IP
+nginx   LoadBalancer   192.168.218.241
+```
 
-Access:
+---
 
+## Access Application
+
+```text
 http://192.168.218.241
+```
 
-Flow:
+---
 
+## Traffic Flow
+
+```
 Browser
-|
+   |
 192.168.218.241
-|
+   |
 LoadBalancer Service
-|
+   |
 Pod
+```
 
 ---
 
 # Endpoints
 
-Definition:
+## Definition
+
 Endpoints show which Pods are connected to a Service.
 
 Check:
 
+```bash
 kubectl get endpoints
+```
 
 Example:
 
-nginx 10.42.2.40:80
+```text
+nginx    10.42.2.40:80
+```
 
-Meaning:
+Flow:
 
+```
 Service
-|
-V
+   |
+Endpoint
+   |
 Pod
+```
 
 ---
 
 # No Endpoints Issue
 
-Output:
+Example:
 
+```text
 php-service
+```
 
 No IP displayed.
 
-Reason:
+---
+
+## Cause
 
 Service selector does not match Pod labels.
 
-Check Service:
+---
 
+## Verify Service
+
+```bash
 kubectl describe svc php-service
+```
 
-Check Labels:
+---
 
+## Verify Pod Labels
+
+```bash
 kubectl get pods --show-labels
+```
 
-Fix:
+---
+
+## Fix
 
 Pod Label:
 
-app=php
+```yaml
+app: php
+```
 
 Service Selector:
 
-app=php
+```yaml
+selector:
+  app: php
+```
 
-Both must match.
+Both must match exactly.
 
 ---
 
-# Scaling
+# Scaling Applications
 
-Increase Pods:
+## Scale Up
 
+```bash
 kubectl scale deployment nginx --replicas=3
-
-Decrease Pods:
-
-kubectl scale deployment nginx --replicas=1
-
-Verify:
-
-kubectl get pods
+```
 
 ---
 
-# Important Commands
+## Scale Down
 
+```bash
+kubectl scale deployment nginx --replicas=1
+```
+
+---
+
+## Verify
+
+```bash
+kubectl get pods
+```
+
+---
+
+# Useful Commands
+
+```bash
 kubectl get pods
 
 kubectl get svc
@@ -364,17 +573,27 @@ kubectl logs <pod-name>
 kubectl get events --sort-by=.lastTimestamp
 
 kubectl get pods --show-labels
+```
 
+---
 
+# Quick Summary
 
-ClusterIP    → Inside Cluster
+| Service Type | Access         |
+| ------------ | -------------- |
+| ClusterIP    | Inside Cluster |
+| NodePort     | NodeIP + Port  |
+| LoadBalancer | External IP    |
 
-NodePort     → NodeIP + Port
+---
 
-LoadBalancer → External IP
+# Key Concepts
 
-Service      → Access Pods
-
-Endpoints    → Connected Pods
-
-MetalLB      → Gives External IP
+| Component    | Purpose                                  |
+| ------------ | ---------------------------------------- |
+| Service      | Provides stable access to Pods           |
+| ClusterIP    | Internal communication                   |
+| NodePort     | External access via Node IP              |
+| LoadBalancer | External access via External IP          |
+| Endpoints    | Connected backend Pods                   |
+| MetalLB      | Assigns External IPs in on-prem clusters |

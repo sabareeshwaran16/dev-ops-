@@ -1,103 +1,345 @@
-Verify Docker Version
-=========================
-# docker version
+# Docker Basic Commands Lab
 
-View System Wide Information
-=========================
-# docker info
+## Objective
 
-Search the Images
-=========================
+In this lab, you will learn how to:
 
-# docker search <Image name> 
-# docker search ubuntu
+- Verify Docker installation
+- Search and download Docker images
+- Run containers in interactive and detached modes
+- Access container terminals
+- Manage container lifecycle
+- Remove containers and images
 
-Download Docker Container Images
-=========================
+---
 
-# docker pull <Image name>
-# docker pull ubuntu:20.04
-# docker pull ubuntu:22.04
+# Verify Docker Version
 
+Check the installed Docker version:
 
-# docker pull centos:8
-# docker pull nginx  
+```bash
+docker version
+```
 
+---
 
+# View System-Wide Docker Information
 
-View Downloaded Docker Container Images
-========================================
+Display Docker daemon and system information:
 
+```bash
+docker info
+```
 
-# docker image ls 
-		(or )
-# docker images
+---
 
+# Search Docker Images
 
+Search for images available on Docker Hub:
 
-# docker run -it --name=mynginx nginx
+```bash
+docker search <image-name>
+```
 
-Type exit to stop / shutdown the container and if want to get out from the container without stopping it then type “ctrl+p+q”
+Example:
 
- 
+```bash
+docker search ubuntu
+```
 
+---
 
+# Download Docker Images
 
-Run Container in detach mode
-============================
+Pull images from Docker Hub:
 
-#docker run -it -d --name=httpd-container httpd
+```bash
+docker pull ubuntu:20.04
+docker pull ubuntu:22.04
+docker pull centos:8
+docker pull nginx
+```
 
-View All Running Containers
-============================
+Verify downloaded images:
 
-# docker ps
+```bash
+docker images
+```
 
-View all running along with exited or stopped containers
-========================================================
+---
 
-#docker ps -a
+# View Downloaded Images
 
-View latest container
-=======================
-#docker ps -l
+List all downloaded images:
 
+```bash
+docker image ls
+```
 
+or
 
-Container Console Access
-=========================
-# docker exec -it <container name or id> /bin/bash
+```bash
+docker images
+```
 
-# docker exec -it httpd-container /bin/bash
+Example Output:
 
+```text
+REPOSITORY   TAG      IMAGE ID       CREATED
+ubuntu       22.04    xxxxxxxxxxxx   2 weeks ago
+nginx        latest   xxxxxxxxxxxx   5 days ago
+```
 
+---
 
-Start, Stop, Restart and Kill Containers
-==================================================
+# Run a Container in Interactive Mode
 
-# docker stop <container name or id>
-# docker stop httpd-container
+Launch an NGINX container:
 
-# docker start <container name or id>
+```bash
+docker run -it --name=mynginx nginx
+```
 
-# docker restart <container name or id>
- 
-# docker kill <container name or id>
+### Exit Options
 
+To stop and exit the container:
 
+```bash
+exit
+```
 
-Remove a Container
-=========================
-# docker stop nginx-container
-# docker rm nginx-container
+To leave the container without stopping it:
 
-To remove a running container forcefully then use ‘-f’ option in docker rm command
+```text
+Ctrl + P + Q
+```
 
-# docker rm -f nginx-container
+---
 
+# Run a Container in Detached Mode
 
-Remove Docker Container Images
-==============================
+Start a container in the background:
 
-# docker rmi ubuntu:20.04
-# docker rmi 54c9d81cbb44
+```bash
+docker run -it -d --name=httpd-container httpd
+```
+
+### Explanation
+
+| Option | Description |
+|----------|-------------|
+| `-i` | Interactive mode |
+| `-t` | Terminal access |
+| `-d` | Detached mode (background) |
+| `--name` | Assign a custom container name |
+
+---
+
+# View Running Containers
+
+Display currently running containers:
+
+```bash
+docker ps
+```
+
+Example Output:
+
+```text
+CONTAINER ID   IMAGE   STATUS
+abc123         httpd   Up 2 minutes
+```
+
+---
+
+# View All Containers
+
+Show running, stopped, and exited containers:
+
+```bash
+docker ps -a
+```
+
+---
+
+# View the Latest Container
+
+Display the most recently created container:
+
+```bash
+docker ps -l
+```
+
+---
+
+# Access Container Terminal
+
+Connect to a running container:
+
+```bash
+docker exec -it <container-name> /bin/bash
+```
+
+Example:
+
+```bash
+docker exec -it httpd-container /bin/bash
+```
+
+---
+
+# Stop a Container
+
+Stop a running container:
+
+```bash
+docker stop httpd-container
+```
+
+---
+
+# Start a Container
+
+Start a stopped container:
+
+```bash
+docker start httpd-container
+```
+
+---
+
+# Restart a Container
+
+Restart a container:
+
+```bash
+docker restart httpd-container
+```
+
+---
+
+# Kill a Container
+
+Forcefully stop a container:
+
+```bash
+docker kill httpd-container
+```
+
+---
+
+# Remove a Container
+
+First stop the container:
+
+```bash
+docker stop nginx-container
+```
+
+Remove the container:
+
+```bash
+docker rm nginx-container
+```
+
+---
+
+# Force Remove a Running Container
+
+Delete a running container without stopping it manually:
+
+```bash
+docker rm -f nginx-container
+```
+
+---
+
+# Remove Docker Images
+
+Delete an image by name:
+
+```bash
+docker rmi ubuntu:20.04
+```
+
+Delete an image by Image ID:
+
+```bash
+docker rmi 54c9d81cbb44
+```
+
+---
+
+# Useful Cleanup Commands
+
+Remove all stopped containers:
+
+```bash
+docker container prune
+```
+
+Remove unused images:
+
+```bash
+docker image prune
+```
+
+Remove unused volumes:
+
+```bash
+docker volume prune
+```
+
+Remove everything unused:
+
+```bash
+docker system prune -a
+```
+
+---
+
+# Verification Commands
+
+Check Docker Version:
+
+```bash
+docker version
+```
+
+List Images:
+
+```bash
+docker images
+```
+
+List Running Containers:
+
+```bash
+docker ps
+```
+
+List All Containers:
+
+```bash
+docker ps -a
+```
+
+Docker System Information:
+
+```bash
+docker info
+```
+
+---
+
+# Key Takeaways
+
+- Docker images are templates used to create containers.
+- Containers are lightweight, isolated runtime environments.
+- `docker pull` downloads images from Docker Hub.
+- `docker run` creates and starts containers.
+- `docker exec` provides terminal access to running containers.
+- `docker ps` displays container status.
+- `docker rm` removes containers.
+- `docker rmi` removes images.
+- `docker system prune -a` helps clean unused Docker resources.

@@ -1,30 +1,30 @@
-# GitLab CI/CD Lab: Build and Push Docker Image to Docker Hub
+ # Kubernetes Lab: WordPress with MySQL StatefulSet using local-path StorageClass
 
 ## Overview
 
-This lab demonstrates how to use GitLab CI/CD to automatically build a Docker image and push it to Docker Hub whenever code is pushed to a GitLab repository.
+This lab demonstrates how to deploy a WordPress application with a MySQL database running as a StatefulSet in Kubernetes.
 
 ### Key Concepts
 
-**GitLab CI/CD**
+**StatefulSet**
 
-* Automates software build and delivery workflows.
-* Executes pipelines whenever code is pushed to GitLab.
+* A Kubernetes workload used for stateful applications.
+* Provides stable pod names, persistent storage, and ordered deployment.
 
-**GitLab Runner**
+**Headless Service**
 
-* Executes CI/CD jobs.
-* Reads instructions from `.gitlab-ci.yml`.
+* A Service with `clusterIP: None`.
+* Provides direct DNS access to individual StatefulSet pods.
 
-**Docker Image**
+**Persistent Volume Claim (PVC)**
 
-* A packaged application with all required dependencies.
-* Built using a Dockerfile.
+* Requests storage from Kubernetes.
+* Ensures data survives pod restarts.
 
-**Docker Hub**
+**StorageClass**
 
-* Public container registry.
-* Stores and distributes Docker images.
+* Automatically provisions storage for PVCs.
+* This lab uses the default `local-path` StorageClass.
 
 ---
 
@@ -32,39 +32,27 @@ This lab demonstrates how to use GitLab CI/CD to automatically build a Docker im
 
 ```text
 +-------------------+
-|    Developer      |
-+---------+---------+
-          |
-          | git push
-          v
-+-------------------+
-| GitLab Repository |
+|    WordPress      |
+| Deployment        |
 +---------+---------+
           |
           |
           v
 +-------------------+
-| GitLab Pipeline   |
+|   mysql Service   |
 +---------+---------+
           |
           |
           v
 +-------------------+
-|  GitLab Runner    |
+| MySQL StatefulSet |
+| mysql-0           |
 +---------+---------+
           |
           |
-          +------> Docker Build
-          |
-          +------> Docker Login
-          |
-          +------> Docker Tag
-          |
-          +------> Docker Push
-          |
           v
 +-------------------+
-|    Docker Hub     |
+| PVC (local-path)  |
 +-------------------+
 ```
 
@@ -72,339 +60,316 @@ This lab demonstrates how to use GitLab CI/CD to automatically build a Docker im
 
 ## Objectives
 
-* Create a sample web application
-* Create a Dockerfile
-* Build a Docker image locally
-* Create a GitLab repository
-* Configure GitLab CI/CD Variables
-* Create a GitLab Pipeline
-* Build Docker image automatically
-* Push Docker image to Docker Hub
-* Verify image availability
-* Pull image in KillerCoda
-* Run the container
+* Create a Namespace
+* Create a Secret
+* Create a Headless Service
+* Deploy MySQL StatefulSet
+* Dynamically provision storage using local-path StorageClass
+* Verify StatefulSet DNS
+* Deploy WordPress
+* Expose WordPress using NodePort
+* Validate persistence
+* Scale StatefulSet replicas
 
 ---
 
 ## Lab Workflow
 
-### 1. Create Project Directory
+### 1. Verify StorageClass
 
 ```bash
-mkdir cicd_demo
-cd cicd_demo
+kubectl get sc
+```
+
+Expected:
+
+```text
+local-path (default)
 ```
 
 ---
 
-### 2. Create Application File
-
-Create:
+### 2. Create Namespace
 
 ```bash
-vi index.html
-```
-
-Add:
-
-```html
-<h1>Hello from GitLab CI/CD</h1>
-```
-
----
-
-### 3. Create Dockerfile
-
-Create:
-
-```bash
-vi Dockerfile
-```
-
-Add:
-
-```dockerfile
-FROM nginx:latest
-
-COPY index.html /usr/share/nginx/html/index.html
-```
-
----
-
-### 4. Build Docker Image Locally
-
-```bash
-docker build -t webapp:v1 .
+kubectl apply -f namespace.yaml
 ```
 
 Verify:
 
 ```bash
-docker images
-```
-
-Expected:
-
-```text
-REPOSITORY   TAG
-webapp       v1
+kubectl get ns
 ```
 
 ---
 
-### 5. Run Container Locally
+### 3. Create MySQL Secret
+
+Stores the MySQL root password securely.
 
 ```bash
-docker run -d -p 8080:80 webapp:v1
+kubectl apply -f mysql-secret.yaml
 ```
 
 Verify:
 
 ```bash
-curl localhost:8080
-```
-
-Expected:
-
-```html
-<h1>Hello from GitLab CI/CD</h1>
+kubectl get secret -n wordpress
 ```
 
 ---
 
-### 6. Create GitLab Repository
+### 4. Create Headless Service
 
-Create a new project in GitLab.
-
-Example:
-
-```text
-cicd-demo
-```
-
----
-
-### 7. Initialize Git Repository
+Provides stable DNS names for StatefulSet pods.
 
 ```bash
-git init
-```
-
-Add files:
-
-```bash
-git add .
-```
-
-Commit:
-
-```bash
-git commit -m "Initial Commit"
-```
-
-Add remote repository:
-
-```bash
-git remote add origin <GITLAB_REPOSITORY_URL>
-```
-
-Push code:
-
-```bash
-git branch -M main
-git push -u origin main
-```
-
----
-
-### 8. Configure GitLab CI/CD Variables
-
-Navigate:
-
-```text
-Project
- └── Settings
-      └── CI/CD
-           └── Variables
-```
-
-Create:
-
-#### DOCKER_USERNAME
-
-```text
-sabareeshwaran6999
-```
-
-#### DOCKER_PASSWORD
-
-```text
-Docker Hub Access Token
-```
-
----
-
-### 9. Create GitLab Pipeline
-
-Create:
-
-```bash
-vi .gitlab-ci.yml
-```
-
-Add:
-
-```yaml
-image: docker:latest
-
-services:
-  - docker:dind
-
-stages:
-  - build
-
-build-image:
-  stage: build
-
-  script:
-    - docker build -t webapp:v1 .
-    - docker images
-    - docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
-    - docker tag webapp:v1 sabareeshwaran6999/cicd_demo:v1
-    - docker push sabareeshwaran6999/cicd_demo:v1
-```
-
----
-
-### 10. Commit Pipeline Configuration
-
-```bash
-git add .
-git commit -m "Added GitLab CI/CD Pipeline"
-git push
-```
-
----
-
-### 11. Verify Pipeline Execution
-
-Navigate:
-
-```text
-Build
- └── Pipelines
-```
-
-Expected:
-
-```text
-Passed
-```
-
-Pipeline executes:
-
-```text
-docker build
-docker images
-docker login
-docker tag
-docker push
-```
-
----
-
-### 12. Verify Docker Hub Repository
-
-Repository:
-
-```text
-sabareeshwaran6999/cicd_demo
-```
-
-Expected Tag:
-
-```text
-v1
-```
-
----
-
-### 13. Pull Image in KillerCoda
-
-```bash
-docker pull sabareeshwaran6999/cicd_demo:v1
+kubectl apply -f mysql-headless-svc.yaml
 ```
 
 Verify:
 
 ```bash
-docker images
+kubectl get svc -n wordpress
 ```
 
 Expected:
 
 ```text
-REPOSITORY                     TAG
-sabareeshwaran6999/cicd_demo   v1
+mysql   ClusterIP   None
 ```
 
 ---
 
-### 14. Run Container in KillerCoda
+### 5. Deploy MySQL StatefulSet
+
+Creates:
+
+* mysql-0
+* PVC automatically
+* Persistent storage
 
 ```bash
-docker run -d \
---name cicd-demo \
--p 8080:80 \
-sabareeshwaran6999/cicd_demo:v1
+kubectl apply -f mysql-sts.yaml
 ```
 
 Verify:
 
 ```bash
-docker ps
+kubectl get sts -n wordpress
+kubectl get pvc -n wordpress
+kubectl get pods -n wordpress
+```
+
+---
+
+### 6. Verify DNS Resolution
+
+Launch a troubleshooting pod:
+
+```bash
+kubectl run ubuntu \
+-n wordpress \
+-it --rm \
+--image=ubuntu:24.04 -- bash
+```
+
+Install tools:
+
+```bash
+apt update
+apt install dnsutils default-mysql-client -y
+```
+
+Test DNS:
+
+```bash
+nslookup mysql-0.mysql.wordpress.svc.cluster.local
+```
+
+---
+
+### 7. Connect to MySQL
+
+```bash
+mysql -u root \
+-h mysql-0.mysql.wordpress.svc.cluster.local \
+-p
+```
+
+Verify:
+
+```sql
+SHOW DATABASES;
 ```
 
 Expected:
 
 ```text
-cicd-demo
+wordpress
+information_schema
+mysql
+performance_schema
 ```
 
 ---
 
-### 15. Access Application
+### 8. Create WordPress PVC
 
 ```bash
-curl localhost:8080
+kubectl apply -f wordpress-pvc.yaml
+```
+
+Verify:
+
+```bash
+kubectl get pvc -n wordpress
+```
+
+---
+
+### 9. Deploy WordPress
+
+```bash
+kubectl apply -f wordpress-deploy.yaml
+```
+
+Verify:
+
+```bash
+kubectl get pods -n wordpress
+```
+
+---
+
+### 10. Expose WordPress
+
+```bash
+kubectl apply -f wordpress-svc.yaml
+```
+
+Verify:
+
+```bash
+kubectl get svc -n wordpress
+```
+
+---
+
+### 11. Access WordPress
+
+Get Node IP:
+
+```bash
+kubectl get nodes -o wide
+```
+
+Open:
+
+```text
+http://<NodeIP>:30080
+```
+
+Complete the WordPress setup.
+
+---
+
+### 12. Verify Persistent Volumes
+
+```bash
+kubectl get pvc -n wordpress
 ```
 
 Expected:
 
-```html
-<h1>Hello from GitLab CI/CD</h1>
+```text
+mysql-data-mysql-0
+wordpress-pvc
+```
+
+---
+
+### 13. Verify MySQL Persistence
+
+Delete the pod:
+
+```bash
+kubectl delete pod mysql-0 -n wordpress
+```
+
+Wait for recreation:
+
+```bash
+kubectl get pods -n wordpress -w
+```
+
+Reconnect to MySQL and verify data still exists.
+
+---
+
+### 14. Verify WordPress Persistence
+
+Delete WordPress pod:
+
+```bash
+kubectl delete pod -l app=wordpress -n wordpress
+```
+
+A new pod is automatically created.
+
+Website data remains available because of PVC.
+
+---
+
+### 15. Scale StatefulSet
+
+Scale MySQL replicas:
+
+```bash
+kubectl scale sts mysql --replicas=3 -n wordpress
+```
+
+Verify:
+
+```bash
+kubectl get pods -n wordpress
+```
+
+Expected:
+
+```text
+mysql-0
+mysql-1
+mysql-2
+```
+
+Check DNS:
+
+```bash
+nslookup mysql-1.mysql.wordpress.svc.cluster.local
+nslookup mysql-2.mysql.wordpress.svc.cluster.local
+```
+
+Verify PVCs:
+
+```bash
+kubectl get pvc -n wordpress
+```
+
+Expected:
+
+```text
+mysql-data-mysql-0
+mysql-data-mysql-1
+mysql-data-mysql-2
 ```
 
 ---
 
 ## Cleanup
 
-Stop container:
-
 ```bash
-docker stop cicd-demo
-```
-
-Remove container:
-
-```bash
-docker rm cicd-demo
-```
-
-Remove image:
-
-```bash
-docker rmi sabareeshwaran6999/cicd_demo:v1
+kubectl delete ns wordpress
 ```
 
 ---
@@ -413,26 +378,30 @@ docker rmi sabareeshwaran6999/cicd_demo:v1
 
 After completing this lab, you will understand:
 
-* GitLab CI/CD
-* GitLab Runner
-* Dockerfile
-* Docker Image Build
-* Docker Image Tagging
-* Docker Hub Authentication
-* Docker Image Push
-* Docker Image Pull
-* Container Execution
-* End-to-End CI Workflow
+* StatefulSet
+* Headless Service
+* Stable Pod DNS
+* Persistent Volume Claims
+* StorageClass
+* Dynamic Volume Provisioning
+* Pod Recovery
+* StatefulSet Scaling
+* WordPress and MySQL Integration
+* Data Persistence in Kubernetes
 
 ---
 
 ## Repository Structure
 
 ```text
-cicd_demo/
+wordpress-statefulset-lab/
 │
-├── index.html
-├── Dockerfile
-├── .gitlab-ci.yml
+├── namespace.yaml
+├── mysql-secret.yaml
+├── mysql-headless-svc.yaml
+├── mysql-sts.yaml
+├── wordpress-pvc.yaml
+├── wordpress-deploy.yaml
+├── wordpress-svc.yaml
 └── README.md
 ```

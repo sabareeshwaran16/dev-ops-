@@ -1,12 +1,20 @@
-# GitLab CI/CD - Docker Build and Push to Docker Hub
+# GitLab CI/CD: Build Docker Image and Push to Docker Hub
 
-## Project Overview
+## Objective
 
-This project demonstrates a simple CI/CD pipeline using GitLab CI/CD. The pipeline automatically builds a Docker image from the application source code and pushes the image to Docker Hub.
+The objective of this project is to automate the Docker image build and push process using GitLab CI/CD.
+
+Whenever code is pushed to GitLab:
+
+1. GitLab Pipeline starts automatically.
+2. Docker image is built.
+3. Image is tagged.
+4. Image is pushed to Docker Hub.
+5. Image can be pulled and run from any environment (KillerCoda, Docker Host, Kubernetes, etc.).
 
 ---
 
-## Architecture
+# Architecture
 
 ```text
 Developer
@@ -23,24 +31,43 @@ GitLab CI/CD Pipeline
     v
 GitLab Runner
     |
-    +--> Build Docker Image
+    +--> Docker Build
     |
-    +--> Login to Docker Hub
+    +--> Docker Login
     |
-    +--> Tag Docker Image
+    +--> Docker Tag
     |
-    +--> Push Docker Image
+    +--> Docker Push
     |
     v
-Docker Hub Repository
+Docker Hub
+    |
+    v
+KillerCoda
 ```
 
 ---
 
-## Project Structure
+# Prerequisites
+
+- GitLab Account
+- Docker Hub Account
+- Git Installed
+- Docker Hub Repository Created
+
+Repository Used:
+
+```text
+sabareeshwaran6999/cicd_demo
+```
+
+---
+
+# Project Structure
 
 ```text
 cicd_demo/
+│
 ├── index.html
 ├── Dockerfile
 └── .gitlab-ci.yml
@@ -48,19 +75,48 @@ cicd_demo/
 
 ---
 
-## Application File
+# Step 1: Create Project Directory
 
-### index.html
+```bash
+mkdir cicd_demo
+cd cicd_demo
+```
+
+---
+
+# Step 2: Create Application File
+
+## index.html
 
 ```html
 <h1>Hello from GitLab CI/CD</h1>
 ```
 
-This is the sample web application that will be served using Nginx.
+Create file:
+
+```bash
+vi index.html
+```
+
+Paste:
+
+```html
+<h1>Hello from GitLab CI/CD</h1>
+```
+
+Save and exit.
 
 ---
 
-## Dockerfile
+# Step 3: Create Dockerfile
+
+Create file:
+
+```bash
+vi Dockerfile
+```
+
+Paste:
 
 ```dockerfile
 FROM nginx:latest
@@ -68,17 +124,146 @@ FROM nginx:latest
 COPY index.html /usr/share/nginx/html/index.html
 ```
 
-### Explanation
-
-- Uses Nginx as the base image.
-- Copies the application file into the Nginx web root directory.
-- Creates a custom Docker image containing the web page.
+Save and exit.
 
 ---
 
-## GitLab CI/CD Pipeline
+# Step 4: Test Docker Image Locally
 
-### .gitlab-ci.yml
+Build image:
+
+```bash
+docker build -t webapp:v1 .
+```
+
+Verify image:
+
+```bash
+docker images
+```
+
+Expected:
+
+```text
+REPOSITORY   TAG
+webapp       v1
+```
+
+Run container:
+
+```bash
+docker run -d -p 8080:80 webapp:v1
+```
+
+Test:
+
+```bash
+curl localhost:8080
+```
+
+Output:
+
+```html
+<h1>Hello from GitLab CI/CD</h1>
+```
+
+---
+
+# Step 5: Create GitLab Repository
+
+Create a new project in GitLab:
+
+```text
+cicd-demo
+```
+
+Copy repository URL.
+
+---
+
+# Step 6: Initialize Git Repository
+
+```bash
+git init
+```
+
+Add files:
+
+```bash
+git add .
+```
+
+Commit:
+
+```bash
+git commit -m "Initial Commit"
+```
+
+Add GitLab remote:
+
+```bash
+git remote add origin <GITLAB_REPOSITORY_URL>
+```
+
+Push code:
+
+```bash
+git branch -M main
+git push -u origin main
+```
+
+---
+
+# Step 7: Configure GitLab CI/CD Variables
+
+Navigate:
+
+```text
+Project
+ └── Settings
+      └── CI/CD
+           └── Variables
+```
+
+Create:
+
+## Variable 1
+
+```text
+DOCKER_USERNAME
+```
+
+Value:
+
+```text
+sabareeshwaran6999
+```
+
+---
+
+## Variable 2
+
+```text
+DOCKER_PASSWORD
+```
+
+Value:
+
+```text
+Docker Hub Access Token
+```
+
+---
+
+# Step 8: Create GitLab Pipeline
+
+Create file:
+
+```bash
+vi .gitlab-ci.yml
+```
+
+Paste:
 
 ```yaml
 image: docker:latest
@@ -100,163 +285,56 @@ build-image:
     - docker push sabareeshwaran6999/cicd_demo:v1
 ```
 
----
-
-## Pipeline Explanation
-
-### image: docker:latest
-
-Provides Docker CLI inside the GitLab Runner container.
-
-```yaml
-image: docker:latest
-```
+Save and exit.
 
 ---
 
-### services: docker:dind
-
-Starts Docker-in-Docker service so Docker commands can be executed within the pipeline.
-
-```yaml
-services:
-  - docker:dind
-```
-
----
-
-### stages
-
-Defines the pipeline stage.
-
-```yaml
-stages:
-  - build
-```
-
----
-
-### docker build
-
-Builds a Docker image using the Dockerfile.
+# Step 9: Commit Pipeline File
 
 ```bash
-docker build -t webapp:v1 .
+git add .
+git commit -m "Added GitLab CI/CD Pipeline"
+git push
 ```
 
-Generated image:
+---
+
+# Step 10: Verify Pipeline
+
+Navigate:
 
 ```text
-webapp:v1
+GitLab
+ └── Build
+      └── Pipelines
 ```
 
----
-
-### docker images
-
-Lists locally available Docker images.
-
-```bash
-docker images
-```
-
----
-
-### docker login
-
-Authenticates with Docker Hub.
-
-```bash
-docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
-```
-
----
-
-### docker tag
-
-Tags the local image with the Docker Hub repository name.
-
-```bash
-docker tag webapp:v1 sabareeshwaran6999/cicd_demo:v1
-```
-
-Before:
+Expected:
 
 ```text
-webapp:v1
+Pipeline Running
 ```
 
-After:
+Stages executed:
 
 ```text
-sabareeshwaran6999/cicd_demo:v1
-```
-
----
-
-### docker push
-
-Pushes the image to Docker Hub.
-
-```bash
-docker push sabareeshwaran6999/cicd_demo:v1
-```
-
----
-
-## GitLab CI/CD Variables
-
-Navigate to:
-
-```text
-Project
-└── Settings
-    └── CI/CD
-        └── Variables
-```
-
-Add the following variables:
-
-| Variable | Description |
-|-----------|-------------|
-| DOCKER_USERNAME | Docker Hub Username |
-| DOCKER_PASSWORD | Docker Hub Access Token |
-
----
-
-## Pipeline Workflow
-
-```text
-Git Push
-   |
-   v
-GitLab Pipeline
-   |
-   v
-Docker Build
-   |
-   v
-webapp:v1
-   |
-   v
+Build Image
 Docker Login
-   |
-   v
 Docker Tag
-   |
-   v
-sabareeshwaran6999/cicd_demo:v1
-   |
-   v
 Docker Push
-   |
-   v
-Docker Hub
+```
+
+Pipeline Status:
+
+```text
+Passed
 ```
 
 ---
 
-## Verify Image in Docker Hub
+# Step 11: Verify Docker Hub
+
+Navigate to Docker Hub.
 
 Repository:
 
@@ -264,47 +342,70 @@ Repository:
 sabareeshwaran6999/cicd_demo
 ```
 
-Image Tag:
+Verify image:
 
 ```text
 v1
 ```
 
+is available.
+
 ---
 
-## Verify Image in KillerCoda
+# Step 12: Pull Image in KillerCoda
 
-### Pull Image
+Pull image:
 
 ```bash
 docker pull sabareeshwaran6999/cicd_demo:v1
 ```
 
-### Verify Image
+Verify:
 
 ```bash
 docker images
 ```
 
-### Run Container
+Expected:
 
-```bash
-docker run -d --name cicd-demo -p 8080:80 sabareeshwaran6999/cicd_demo:v1
+```text
+REPOSITORY                     TAG
+sabareeshwaran6999/cicd_demo   v1
 ```
 
-### Check Running Containers
+---
+
+# Step 13: Run Container in KillerCoda
+
+```bash
+docker run -d \
+--name cicd-demo \
+-p 8080:80 \
+sabareeshwaran6999/cicd_demo:v1
+```
+
+Verify:
 
 ```bash
 docker ps
 ```
 
-### Access Application
+Expected:
+
+```text
+CONTAINER ID
+cicd-demo
+```
+
+---
+
+# Step 14: Test Application
 
 ```bash
 curl localhost:8080
 ```
 
-Expected Output:
+Expected:
 
 ```html
 <h1>Hello from GitLab CI/CD</h1>
@@ -312,35 +413,83 @@ Expected Output:
 
 ---
 
-## Learning Outcomes
+# Pipeline Workflow
+
+```text
+Git Push
+   |
+   v
+GitLab Pipeline
+   |
+   +--> docker build
+   |
+   +--> docker login
+   |
+   +--> docker tag
+   |
+   +--> docker push
+   |
+   v
+Docker Hub
+   |
+   v
+docker pull
+   |
+   v
+KillerCoda
+```
+
+---
+
+# Commands Summary
+
+## Docker Commands
+
+```bash
+docker build -t webapp:v1 .
+docker images
+docker run -d -p 8080:80 webapp:v1
+docker pull sabareeshwaran6999/cicd_demo:v1
+docker ps
+docker logs cicd-demo
+```
+
+## Git Commands
+
+```bash
+git init
+git add .
+git commit -m "Initial Commit"
+git remote add origin <REPO_URL>
+git branch -M main
+git push -u origin main
+
+git add .
+git commit -m "Added Pipeline"
+git push
+```
+
+---
+
+# Learning Outcomes
 
 After completing this project, you will understand:
 
-- GitLab CI/CD fundamentals
-- GitLab Runner execution flow
-- Docker image creation using Dockerfile
-- Docker Hub authentication
-- Docker image tagging
-- Docker image push process
-- Docker image pull process
-- Running containers using Docker
-- End-to-end CI workflow
+- GitLab CI/CD Basics
+- GitLab Runner
+- Docker Build Process
+- Docker Hub Authentication
+- Docker Image Tagging
+- Docker Image Push
+- Docker Image Pull
+- Container Execution
+- End-to-End CI Workflow
 
 ---
 
-## Conclusion
+# Next Phase
 
-This project demonstrates a complete Continuous Integration (CI) workflow using GitLab CI/CD. Whenever code is pushed to GitLab, the pipeline automatically builds a Docker image, tags it, and pushes it to Docker Hub. The image can then be pulled and executed on any environment such as KillerCoda, Docker hosts, or Kubernetes clusters.
-
----
-
-## Next Steps
-
-- Add a Test Stage
-- Use Dynamic Image Tags
-- Push Images to GitLab Container Registry
-- Deploy to Kubernetes
-- Implement Complete CI/CD Workflow
+The next enhancement is deploying the Docker image automatically to Kubernetes.
 
 ```text
 Git Push
@@ -348,11 +497,10 @@ Git Push
    v
 GitLab CI/CD
    |
-   +--> Build
-   +--> Test
+   +--> Build Image
    +--> Push Image
    +--> Deploy to Kubernetes
    |
    v
-Production Application
+Application Running in Kubernetes
 ```
